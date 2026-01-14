@@ -1,5 +1,5 @@
 {
-  "api_key": "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",
+  "api_key": "<your-openrouter-key>",
   "models": [
     {
       "id": "bytedance-seed/seed-1.6-flash",
