@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AI OCR{% endblock %}</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+    <!-- 引入 SortableJS -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    {% block header %}
+    <header>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <div class="header-title">AI OCR</div>
+            <div id="status-indicator">Ready</div>
+        </div>
+        <button class="btn btn-secondary" onclick="openHistory()">📜 History</button>
+    </header>
+    {% endblock %}
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    {% block modals %}
+    <div id="history-modal" class="modal-overlay" onclick="if(event.target===this) closeModal()">
+        <div id="history-modal-content">
+            <h3 style="margin-top:0;">History</h3>
+            <div id="history-list"></div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="image-preview-modal" class="modal-overlay" onclick="handlePreviewOverlayClick(event)">
+        <button class="close-view-btn" onclick="closeImagePreview()">×</button>
+        <div class="viewport">
+            <img id="preview-image" src="" alt="Preview" onclick="event.stopPropagation()">
+            <div class="zoom-tip">Scroll: Zoom | Drag: Pan | Click Background: Close</div>
+        </div>
+    </div>
+    {% endblock %}
+
+    {% block scripts %}
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% endblock %}
+</body>
+</html>
