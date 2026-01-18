@@ -9,7 +9,7 @@
         <div id="drop-hint" style="color: var(--text-muted); text-align: center; width: 100%;">Drop images or paste</div>
     </div>
     <div style="padding: 0.75rem; border-top: 1px solid var(--border);">
-        <button class="btn btn-secondary" style="width: 100%; font-size: 12px;" onclick="clearAll()">Clear All</button>
+        <button class="btn btn-secondary" style="width: 100%; font-size: 12px;" onclick="clearInput()">Clear Input</button>
     </div>
 </div>
 
@@ -18,7 +18,7 @@
         <select id="model-select">
             {% for model in models %}
             <option value="{{ model.id }}" {% if model.id == default_model %}selected{% endif %}>
-                {{ model.name }}
+                {{ model.id }}
             </option>
             {% endfor %}
         </select>
@@ -26,18 +26,10 @@
         <div class="toggle-container">
             <label for="reasoning-toggle">Reasoning</label>
             <label class="toggle-switch">
-                <input type="checkbox" id="reasoning-toggle" {% if enable_reasoning %}checked{% endif %}>
+                <input type="checkbox" id="reasoning-toggle" {% if enable_reasoning_checked %}checked{% endif %}>
                 <span class="toggle-slider"></span>
             </label>
         </div>
-    </div>
-
-    <div id="reasoning-content" style="display: none;">
-        <div class="reasoning-header" onclick="toggleReasoningDisplay()">
-            <span>Reasoning Content</span>
-            <span id="reasoning-toggle-icon">▼</span>
-        </div>
-        <div class="reasoning-body" id="reasoning-display"></div>
     </div>
 
     <div class="toolbar">
@@ -45,6 +37,26 @@
         <button id="btn-recognize" class="btn" onclick="toggleRecognize()">Start</button>
         <button class="btn btn-secondary" onclick="copyResult()">Copy</button>
     </div>
-    <div id="result-display"></div>
+
+    <!-- Dual-box container with dynamic height distribution -->
+    <div id="dual-box-container" class="dual-box-container">
+        <div id="reasoning-box" class="collapsible-box">
+            <div class="box-header" onclick="toggleBox('reasoning')">
+                <span class="box-title">Reasoning</span>
+                <span class="box-status" id="reasoning-status"></span>
+                <span id="reasoning-toggle-icon">▼</span>
+            </div>
+            <div class="box-body" id="reasoning-display"></div>
+        </div>
+
+        <div id="output-box" class="collapsible-box">
+            <div class="box-header" onclick="toggleBox('output')">
+                <span class="box-title">Output</span>
+                <span class="box-status" id="output-status"></span>
+                <span id="output-toggle-icon">▼</span>
+            </div>
+            <div class="box-body" id="result-display"></div>
+        </div>
+    </div>
 </div>
 {% endblock %}

@@ -42,6 +42,7 @@ body {
     flex-direction: column;
     height: 100vh;
     overflow: hidden;
+    min-width: 360px;
 }
 
 header {
@@ -170,7 +171,23 @@ main {
     z-index: 10;
 }
 
-.content-area { padding: 1.25rem; flex: 1; display: flex; flex-direction: column; width: 100%; }
+.content-area {
+    padding: 1.25rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 0; /* Important for flex children scrolling */
+}
+
+.content-area > .toolbar {
+    flex-shrink: 0;
+}
+
+.content-area > .collapsible-box {
+    flex: 1;
+    min-height: 0; /* Important for scrolling */
+}
 
 .toolbar { display: flex; gap: 10px; margin-bottom: 1rem; width: 100%; }
 
@@ -270,6 +287,133 @@ input:checked + .toggle-slider:before {
     transform: translateX(26px);
 }
 
+input:disabled + .toggle-slider {
+    background-color: var(--border);
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+input:disabled + .toggle-slider:before {
+    opacity: 0.7;
+}
+
+/* Disabled toggle container */
+.toggle-container.disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* Dual-box container with dynamic height distribution */
+.dual-box-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* Important for scrolling */
+    margin-bottom: 1rem;
+    gap: 8px; /* Space between boxes */
+}
+
+/* Dual-box layout styles */
+.collapsible-box {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 40px; /* flex-grow: 1, flex-shrink: 1, flex-basis: 40px (header height) */
+    transition: flex-grow 0.3s ease;
+    min-height: 40px; /* Ensure header is visible */
+}
+
+.collapsible-box.expanded {
+    flex-grow: 3; /* Takes more space when expanded */
+}
+
+.collapsible-box.collapsed {
+    flex-grow: 0.3; /* Takes less space when collapsed */
+}
+
+.box-header {
+    background: var(--input-bg);
+    padding: 8px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-muted);
+    flex-shrink: 0; /* Prevent header from shrinking */
+    min-height: 40px; /* Fixed header height */
+    gap: 6px; /* Space between elements */
+}
+
+.box-title {
+    flex: 1; /* Take available space */
+}
+
+.box-status {
+    font-size: 12px;
+    color: var(--text-muted);
+    min-width: 24px;
+    text-align: center;
+}
+
+.box-status.spinning::after {
+    content: "";
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: var(--warning);
+    animation: pulse 1.5s ease-in-out infinite;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+.box-status.completed::after {
+    content: "✔";
+    color: var(--success);
+    font-size: 18px;
+    font-weight: bold;
+    margin-left: 2px;
+}
+
+.box-status.error::after {
+    content: "❌";
+    color: var(--danger);
+    font-size: 18px;
+    font-weight: bold;
+    margin-left: 2px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+}
+
+.box-body {
+    background: var(--card-bg);
+    padding: 12px;
+    overflow-y: auto;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    display: block;
+    flex: 1;
+    min-height: 0;
+}
+
+.collapsible-box.collapsed .box-body {
+    display: none; /* Hide content when collapsed */
+}
+
+/* Legacy reasoning content styles (kept for compatibility) */
 #reasoning-content {
     margin-bottom: 1rem;
     border: 1px solid var(--border);
@@ -305,18 +449,14 @@ input:checked + .toggle-slider:before {
 }
 
 #result-display {
-    flex: 1;
     width: 100%;
-    background: var(--input-bg);
-    border: 1px solid var(--border);
+    background: var(--card-bg);
     font-family: 'Consolas', 'Monaco', monospace;
-    padding: 1rem;
     color: var(--text-main);
-    overflow-y: auto;
-    border-radius: 6px;
     white-space: pre-wrap;
     line-height: 1.6;
     scroll-behavior: smooth;
+    min-height: 100px;
 }
 
 .history-item {
@@ -334,12 +474,19 @@ input:checked + .toggle-slider:before {
 
 #history-modal-content {
     background: var(--card-bg); padding: 1.5rem; border-radius: 12px;
-    width: 90%; max-width: 550px; margin: 8vh auto;
+    width: 90%; max-width: 550px;
+    height: 80vh; max-height: 80vh;
+    margin: 10vh auto; /* top and bottom 10% */
     box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);
     display: flex; flex-direction: column;
+    overflow: hidden; /* ensure inner scrolling */
 }
 
-#history-list { max-height: 70vh; overflow-y: auto; margin: 10px 0; }
+#history-list {
+    flex: 1;
+    overflow-y: auto;
+    margin: 10px 0;
+}
 
 .modal-footer { text-align: right; margin-top: 1rem; flex-shrink: 0; }
 
@@ -378,4 +525,18 @@ input:checked + .toggle-slider:before {
     main { grid-template-columns: 1fr; overflow-y: auto; }
     .card { max-height: none; }
     .control-group { flex-wrap: wrap; }
+}
+
+@media (max-height: 400px) {
+    body {
+        overflow: auto;
+        height: auto;
+    }
+    main {
+        overflow: visible;
+        min-height: 400px;
+    }
+    .dual-box-container {
+        min-height: 300px;
+    }
 }

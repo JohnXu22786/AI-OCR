@@ -62,18 +62,20 @@ def add_to_history(text):
 @app.route('/')
 def index():
     """Render main page"""
+    enable_reasoning_by_default = config.get('enable_reasoning_by_default', True)
     return render_template('index.html',
                          config=config,
                          models=config.get('models', []),
                          default_model=config.get('default_model', ''),
-                         enable_reasoning=config.get('enable_reasoning_by_default', True))
+                         enable_reasoning_checked=enable_reasoning_by_default)
 
 @app.route('/api/models', methods=['GET'])
 def get_models():
     """Return available models"""
     return jsonify({
         'models': config.get('models', []),
-        'default_model': config.get('default_model', '')
+        'default_model': config.get('default_model', ''),
+        'enable_reasoning_by_default': config.get('enable_reasoning_by_default', 'true')
     })
 
 @app.route('/api/history', methods=['GET'])

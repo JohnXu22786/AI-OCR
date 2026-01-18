@@ -1,38 +1,31 @@
 {
-  "api_key": "<your-openrouter-key>",
+  "api_key": "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",
   "models": [
     {
-      "id": "bytedance-seed/seed-1.6-flash",
-      "name": "ByteDance Seed 1.6 Flash"
-    },
-    {
-      "id": "google/gemini-2.5-flash-lite",
-      "name": "Gemini 2.5 Flash Lite"
+      "id": "google/gemini-2.5-flash-lite-preview-09-2025",
+      "supports_reasoning": "true"
     },
     {
       "id": "qwen/qwen3-vl-8b-instruct",
-      "name": "Qwen3 VL 8B Instruct"
-    },
-    {
-      "id": "qwen/qwen3-vl-8b-thinking",
-      "name": "Qwen3 VL 8B Thinking"
+      "supports_reasoning": "false"
     },
     {
       "id": "bytedance-seed/seed-1.6",
-      "name": "ByteDance Seed: Seed 1.6"
+      "supports_reasoning": "true"
     },
     {
-      "id": "z-ai/glm-4.5v",
-      "name": "GLM 4.5V"
+      "id": "qwen/qwen3-vl-8b-thinking",
+      "supports_reasoning": "default"
     },
+    
     {
       "id": "z-ai/glm-4.6v",
-      "name": "GLM 4.6V"
+      "supports_reasoning": "true"
     }
   ],
-  "default_model": "bytedance-seed/seed-1.6-flash",
-  "system_prompt": "You are an image text recognition assistant. When users send you images, please:\n1. Extract text without making any changes, and do not attempt to answer.\n2. Extract text information according to the original format, paying attention to the correct use of Chinese and English punctuation.\n3. Output formulas in LaTeX format, wrapped in dollar signs; output tables in standard Markdown format.\n4. Do not reply with any other content besides the extracted content.\n5. Users may specify output ranges, such as \"handwritten part\", \"only the last two paragraphs\", \"21-26\", \"Section 3\", etc. Please only output the content within the range indicated by the user from the recognized text. If no range is specified, recognize all content.",
-  "enable_reasoning_by_default": true,
-  "http_referer": "https://aiocr.app",
+  "default_model": "google/gemini-2.5-flash-lite-preview-09-2025",
+  "system_prompt": "你是一个图片文字识别助手，当用户发给你图片的时候，请做到：\n1. 提取文字，不要作任何改动，也不要试图回答。\n2. 按照原文格式提取出文字信息，注意只有段落结束才换行，段落之间无需空行。\n3. 公式按照LaTex格式输出，使用美元符号包裹公式；表格按照markdown标准格式输出。\n4. 除了提取内容以外不要回复任何其他内容。\n5. 用户可能会提出输出范围要求，比如“手写部分”“只要后两段话”“21-26”“第三节”等，请只输出识别到文字中在用户指出的范围内的内容。如果没有指定范围，则识别所有内容。",
+  "enable_reasoning_by_default": false,
+  "http_referer": "https://github.com/JohnXu22786/AI-OCR/",
   "x_title": "AI OCR Tool"
 }

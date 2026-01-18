@@ -12,7 +12,7 @@ let reasoningContent = ''; // Store reasoning content
 let APP_CONFIG = {
     apiKey: '',
     defaultModel: '',
-    enableReasoningByDefault: true,
+    enableReasoningByDefault: true, // boolean: true or false
     systemPrompt: ''
 };
 
@@ -51,15 +51,77 @@ async function loadConfig() {
             const data = await response.json();
             APP_CONFIG.models = data.models;
             APP_CONFIG.defaultModel = data.default_model;
+            APP_CONFIG.enableReasoningByDefault = data.enable_reasoning_by_default !== undefined ? data.enable_reasoning_by_default : true;
 
             // Set default model in select if not already set
             const modelSelect = document.getElementById('model-select');
             if (modelSelect && !modelSelect.value) {
                 modelSelect.value = APP_CONFIG.defaultModel;
             }
+
+            // Add event listener for model selection change
+            modelSelect.addEventListener('change', updateReasoningToggleState);
+
+            // Add event listener for reasoning toggle change
+            const reasoningToggle = document.getElementById('reasoning-toggle');
+            if (reasoningToggle) {
+                reasoningToggle.addEventListener('change', updateReasoningToggleState);
+            }
+
+            // Initial update of reasoning toggle state
+            updateReasoningToggleState();
         }
     } catch (error) {
         console.error('Failed to load configuration:', error);
+    }
+}
+
+// Update reasoning toggle state based on selected model and config
+function updateReasoningToggleState() {
+    const modelSelect = document.getElementById('model-select');
+    const reasoningToggle = document.getElementById('reasoning-toggle');
+    const selectedModelId = modelSelect.value;
+
+    // Find the selected model
+    const selectedModel = APP_CONFIG.models?.find(model => model.id === selectedModelId);
+    if (!selectedModel) return;
+
+    // Get model's supports_reasoning value (string: 'default', 'true', or 'false')
+    const supportsReasoning = selectedModel.supports_reasoning;
+    const toggleContainer = reasoningToggle.parentElement.parentElement;
+
+    switch (supportsReasoning) {
+        case 'false':
+            // Model does not support reasoning: disable toggle and uncheck it
+            reasoningToggle.disabled = true;
+            reasoningToggle.checked = false;
+            reasoningToggle.parentElement.style.opacity = '0.5';
+            toggleContainer.classList.add('disabled');
+            toggleContainer.style.cursor = 'not-allowed';
+            break;
+        case 'default':
+            // Default reasoning always on and cannot be changed
+            reasoningToggle.disabled = true;
+            reasoningToggle.checked = true;
+            reasoningToggle.parentElement.style.opacity = '0.7';
+            toggleContainer.classList.add('disabled');
+            toggleContainer.style.cursor = 'not-allowed';
+            break;
+        case 'true':
+            // Model supports reasoning, user can freely toggle (like before)
+            reasoningToggle.disabled = false;
+            reasoningToggle.parentElement.style.opacity = '1';
+            toggleContainer.classList.remove('disabled');
+            toggleContainer.style.cursor = 'pointer';
+            // Note: checked state is already set by template, user can change it freely
+            break;
+        default:
+            // Fallback: treat as 'false' for unknown values
+            reasoningToggle.disabled = true;
+            reasoningToggle.checked = false;
+            reasoningToggle.parentElement.style.opacity = '0.5';
+            toggleContainer.classList.add('disabled');
+            toggleContainer.style.cursor = 'not-allowed';
     }
 }
 
@@ -146,14 +208,12 @@ function removeImage(id) {
     renderImages();
 }
 
-function clearAll() {
-    if(confirm("Clear all items and prompts?")) {
+function clearInput() {
+    if(confirm("Clear input images and prompt?")) {
         currentImages = [];
         renderImages();
-        document.getElementById('result-display').innerText = "";
         document.getElementById('user-prompt').value = "";
-        reasoningContent = '';
-        hideReasoningContent();
+        // Do not clear result display, reasoning content, or change box expansion state
     }
 }
 
@@ -190,11 +250,17 @@ async function toggleRecognize() {
     display.innerText = "";
     reasoningContent = '';
     reasoningDisplay.innerText = '';
-    hideReasoningContent();
+
+    // Clear previous status indicators
+    const reasoningStatus = document.getElementById('reasoning-status');
+    const outputStatus = document.getElementById('output-status');
+    reasoningStatus.className = 'box-status';
+    outputStatus.className = 'box-status';
 
     abortController = new AbortController();
     let fullText = "";
     let reasoningText = "";
+    const reasoningEnabled = document.getElementById('reasoning-toggle').checked;
 
     try {
         // Prepare request data
@@ -204,6 +270,42 @@ async function toggleRecognize() {
             model: document.getElementById('model-select').value,
             enable_reasoning: document.getElementById('reasoning-toggle').checked
         };
+
+        // Set box states based on actual request (enable_reasoning)
+        const reasoningBox = document.getElementById('reasoning-box');
+        const outputBox = document.getElementById('output-box');
+
+        if (reasoningEnabled) {
+            // Show reasoning box and set initial state: reasoning expanded, output collapsed
+            reasoningBox.style.display = 'flex';
+            reasoningBox.classList.remove('collapsed');
+            reasoningBox.classList.add('expanded');
+            document.getElementById('reasoning-toggle-icon').textContent = '▲';
+
+            outputBox.classList.remove('expanded');
+            outputBox.classList.add('collapsed');
+            document.getElementById('output-toggle-icon').textContent = '▼';
+
+            // Clear any spinning status from output status
+            outputStatus.className = 'box-status';
+            // Set reasoning status to spinning
+            reasoningStatus.className = 'box-status spinning';
+        } else {
+            // Hide reasoning box and expand output box
+            reasoningBox.style.display = 'none';
+            reasoningBox.classList.remove('expanded');
+            reasoningBox.classList.add('collapsed');
+            document.getElementById('reasoning-toggle-icon').textContent = '▼';
+
+            outputBox.classList.remove('collapsed');
+            outputBox.classList.add('expanded');
+            document.getElementById('output-toggle-icon').textContent = '▲';
+
+            // Clear any spinning status from reasoning status
+            reasoningStatus.className = 'box-status';
+            // Set output status to spinning
+            outputStatus.className = 'box-status spinning';
+        }
 
         // Update status: processing (after connecting)
         updateStatus("Processing...", 'processing');
@@ -243,17 +345,32 @@ async function toggleRecognize() {
                 if (trimmed.startsWith("data: ")) {
                     try {
                         const json = JSON.parse(trimmed.slice(6));
-                        const content = json.choices[0]?.delta?.content || "";
-                        if (content) {
-                            fullText += content;
-                            display.innerText = fullText;
-                            display.scrollTo({ top: display.scrollHeight, behavior: 'smooth' });
 
-                            // Check if this might be reasoning content
-                            // (This is a simple heuristic - OpenRouter may not separate reasoning)
-                            if (json.choices[0]?.delta?.reasoning) {
-                                reasoningText += json.choices[0].delta.reasoning;
+                        // Check for OpenRouter reasoning format (type: 'response.reasoning.delta')
+                        if (json.type === 'response.reasoning.delta') {
+                            const reasoningDelta = json.delta || "";
+                            if (reasoningDelta) {
+                                reasoningText += reasoningDelta;
                                 showReasoningContent(reasoningText);
+                            }
+                        }
+                        // Check for standard OpenAI format with reasoning
+                        else if (json.choices && json.choices[0]?.delta) {
+                            const delta = json.choices[0].delta;
+                            const content = delta.content || "";
+                            const reasoning = delta.reasoning || "";
+
+                            // Handle reasoning content
+                            if (reasoning) {
+                                reasoningText += reasoning;
+                                showReasoningContent(reasoningText);
+                            }
+
+                            // Handle regular output content
+                            if (content) {
+                                fullText += content;
+                                display.innerText = fullText;
+                                display.scrollTo({ top: display.scrollHeight, behavior: 'smooth' });
                             }
                         }
                     } catch (e) {
@@ -282,13 +399,36 @@ async function toggleRecognize() {
 
             updateStatus("Done", 'success');
 
-            // Auto-collapse reasoning content after final output
+            // Update box status indicators to completed
+            const reasoningStatus = document.getElementById('reasoning-status');
+            const outputStatus = document.getElementById('output-status');
+            if (reasoningEnabled && reasoningText) {
+                reasoningStatus.className = 'box-status completed';
+                // Output is also completed since stream has ended
+                outputStatus.className = 'box-status completed';
+            } else {
+                // If reasoning not enabled, output was spinning, now mark as completed
+                outputStatus.className = 'box-status completed';
+            }
+
+            // Auto-switch boxes after final output: collapse reasoning, expand output
             if (reasoningText) {
                 setTimeout(() => {
-                    const reasoningDisplay = document.getElementById('reasoning-display');
-                    if (reasoningDisplay.classList.contains('expanded')) {
-                        reasoningDisplay.classList.remove('expanded');
+                    const reasoningBox = document.getElementById('reasoning-box');
+                    const outputBox = document.getElementById('output-box');
+
+                    // Only switch if reasoning box is visible
+                    if (reasoningBox.style.display !== 'none') {
+                        // Collapse reasoning box and expand output box (mutually exclusive)
+                        reasoningBox.classList.remove('expanded');
+                        reasoningBox.classList.add('collapsed');
                         document.getElementById('reasoning-toggle-icon').textContent = '▼';
+
+                        outputBox.classList.remove('collapsed');
+                        outputBox.classList.add('expanded');
+                        document.getElementById('output-toggle-icon').textContent = '▲';
+
+                        // Output already marked as completed
                     }
                 }, 1000);
             }
@@ -297,9 +437,15 @@ async function toggleRecognize() {
     } catch (err) {
         if (err.name === 'AbortError') {
             updateStatus("Stopped", 'error');
+            // Clear spinning status indicators when user stops
+            reasoningStatus.className = 'box-status';
+            outputStatus.className = 'box-status';
         } else {
             updateStatus("Error: " + err.message, 'error');
             console.error(err);
+            // Set error status indicators
+            reasoningStatus.className = 'box-status error';
+            outputStatus.className = 'box-status error';
         }
     } finally {
         isRecognizing = false;
@@ -312,35 +458,84 @@ async function toggleRecognize() {
 function showReasoningContent(content) {
     reasoningContent = content;
     const reasoningDisplay = document.getElementById('reasoning-display');
-    const reasoningContainer = document.getElementById('reasoning-content');
+    const reasoningBox = document.getElementById('reasoning-box');
+    const outputBox = document.getElementById('output-box');
 
     if (content && content.trim()) {
         reasoningDisplay.innerText = content;
-        reasoningContainer.style.display = 'block';
+        // Ensure reasoning box is visible
+        reasoningBox.style.display = 'flex';
+
+        // Expand reasoning box and collapse output box (mutually exclusive)
+        reasoningBox.classList.remove('collapsed');
+        reasoningBox.classList.add('expanded');
+        document.getElementById('reasoning-toggle-icon').textContent = '▲';
+
+        outputBox.classList.remove('expanded');
+        outputBox.classList.add('collapsed');
+        document.getElementById('output-toggle-icon').textContent = '▼';
+
+        // Ensure reasoning status shows spinning, output status does not
+        const reasoningStatus = document.getElementById('reasoning-status');
+        const outputStatus = document.getElementById('output-status');
+        outputStatus.className = 'box-status';
+        reasoningStatus.className = 'box-status spinning';
     } else {
         hideReasoningContent();
     }
 }
 
 function hideReasoningContent() {
-    const reasoningContainer = document.getElementById('reasoning-content');
-    reasoningContainer.style.display = 'none';
-    const reasoningDisplay = document.getElementById('reasoning-display');
-    reasoningDisplay.classList.remove('expanded');
-    document.getElementById('reasoning-toggle-icon').textContent = '▼';
+    const reasoningBox = document.getElementById('reasoning-box');
+    const outputBox = document.getElementById('output-box');
+    // Collapse reasoning box and expand output box (mutually exclusive)
+    if (!reasoningBox.classList.contains('collapsed')) {
+        reasoningBox.classList.remove('expanded');
+        reasoningBox.classList.add('collapsed');
+        document.getElementById('reasoning-toggle-icon').textContent = '▼';
+
+        outputBox.classList.remove('collapsed');
+        outputBox.classList.add('expanded');
+        document.getElementById('output-toggle-icon').textContent = '▲';
+    }
 }
 
-function toggleReasoningDisplay() {
-    const reasoningDisplay = document.getElementById('reasoning-display');
-    const toggleIcon = document.getElementById('reasoning-toggle-icon');
+function toggleBox(boxType) {
+    const reasoningBox = document.getElementById('reasoning-box');
+    const outputBox = document.getElementById('output-box');
+    const reasoningToggleIcon = document.getElementById('reasoning-toggle-icon');
+    const outputToggleIcon = document.getElementById('output-toggle-icon');
 
-    if (reasoningDisplay.classList.contains('expanded')) {
-        reasoningDisplay.classList.remove('expanded');
-        toggleIcon.textContent = '▼';
+    const targetBox = boxType === 'reasoning' ? reasoningBox : outputBox;
+    const otherBox = boxType === 'reasoning' ? outputBox : reasoningBox;
+    const targetToggleIcon = boxType === 'reasoning' ? reasoningToggleIcon : outputToggleIcon;
+    const otherToggleIcon = boxType === 'reasoning' ? outputToggleIcon : reasoningToggleIcon;
+
+    // Toggle the target box
+    if (targetBox.classList.contains('collapsed')) {
+        // Expand target box, collapse other box
+        targetBox.classList.remove('collapsed');
+        targetBox.classList.add('expanded');
+        targetToggleIcon.textContent = '▲';
+
+        otherBox.classList.remove('expanded');
+        otherBox.classList.add('collapsed');
+        otherToggleIcon.textContent = '▼';
     } else {
-        reasoningDisplay.classList.add('expanded');
-        toggleIcon.textContent = '▲';
+        // Target box is expanded, collapse it and expand other box
+        targetBox.classList.remove('expanded');
+        targetBox.classList.add('collapsed');
+        targetToggleIcon.textContent = '▼';
+
+        otherBox.classList.remove('collapsed');
+        otherBox.classList.add('expanded');
+        otherToggleIcon.textContent = '▲';
     }
+}
+
+// Legacy function for backward compatibility
+function toggleReasoningDisplay() {
+    toggleBox('reasoning');
 }
 
 function updateStatus(msg, type) {
