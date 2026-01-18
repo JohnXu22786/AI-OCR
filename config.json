@@ -1,5 +1,5 @@
 {
-  "api_key": "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",
+  "api_key": "<YOUR_OPENROUTER_KEY_HERE>",
   "models": [
     {
       "id": "google/gemini-2.5-flash-lite-preview-09-2025",
