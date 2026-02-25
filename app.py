@@ -31,6 +31,22 @@ except Exception as e:
     logger.error(f"Failed to load configuration: {e}")
     config = {}
 
+# Load API key from environment variable (required)
+env_api_keys = os.environ.get('AI-OCR_API_KEYS')
+if env_api_keys:
+    # Support comma-separated multiple API keys
+    api_key_list = [key.strip() for key in env_api_keys.split(',') if key.strip()]
+    if api_key_list:
+        # Use the first API key for now (can be extended to rotate keys if needed)
+        config['api_key'] = api_key_list[0]
+        logger.info(f"API key loaded from environment variable (total keys: {len(api_key_list)})")
+    else:
+        logger.error("AI-OCR_API_KEYS environment variable is empty")
+        config['api_key'] = ''
+else:
+    logger.error("AI-OCR_API_KEYS environment variable is not set")
+    config['api_key'] = ''
+
 # In-memory session storage for history (per session)
 # Note: This will be lost when the server restarts
 session_history = {}
