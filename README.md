@@ -37,7 +37,7 @@ API-OCR/
 
 Edit `config.json` to customize:
 
-- `api_key`: Your OpenRouter API key
+- `api_key`: **Removed from config.json** - Must be set via `AI-OCR_API_KEYS` environment variable
 - `models`: List of available models with id and name
 - `default_model`: Default selected model
 - `system_prompt`: System prompt for OCR tasks
@@ -78,7 +78,7 @@ The application will be available at `http://localhost:5000`
 ## Notes
 
 - History is stored in memory per session and lost on server restart
-- API key and configuration are stored in `config.json`, not in code
+- API key must be set via `AI-OCR_API_KEYS` environment variable (comma-separated for multiple keys) - removed from `config.json`
 - The application proxies requests to OpenRouter API for security
 - Streaming responses provide real-time text extraction feedback
 - Original color scheme and styling preserved from v1.0.4.html
