@@ -8,6 +8,11 @@ let sessionHistory = [];
 let scale = 1, posX = 0, posY = 0, isDragging = false, startX, startY;
 let reasoningContent = ''; // Store reasoning content
 
+// History pagination state
+let currentHistoryPage = 1;
+let historyTotalPages = 1;
+let historyTotalRecords = 0;
+
 // Application configuration (will be populated from server)
 let APP_CONFIG = {
     apiKey: '',
@@ -125,18 +130,29 @@ function updateReasoningToggleState() {
     }
 }
 
-// Load history from server
-async function loadHistory() {
+// Load history from server with pagination
+async function loadHistory(page = 1, perPage = 10) {
     try {
-        const response = await fetch('/api/history');
+        const response = await fetch(`/api/history?page=${page}&per_page=${perPage}`);
         if (response.ok) {
             const data = await response.json();
             sessionHistory = data.history || [];
+            currentHistoryPage = data.page || 1;
+            historyTotalPages = data.total_pages || 1;
+            historyTotalRecords = data.total || 0;
+
+            // If using file-based storage, sessionHistory only contains current page
+            // So we don't replace the entire history array, just update current page items
+            return data;
         }
     } catch (error) {
         console.error('Failed to load history:', error);
         sessionHistory = [];
+        currentHistoryPage = 1;
+        historyTotalPages = 1;
+        historyTotalRecords = 0;
     }
+    return null;
 }
 
 // Image interaction setup
@@ -390,13 +406,7 @@ async function toggleRecognize() {
         }
 
         if (fullText) {
-            // Add to local history
-            sessionHistory.unshift({
-                id: Date.now(),
-                time: new Date().toLocaleTimeString(),
-                text: fullText
-            });
-
+            // History is automatically added by backend API
             updateStatus("Done", 'success');
 
             // Update box status indicators to completed
@@ -558,9 +568,25 @@ function copyToClipboard(text) {
     });
 }
 
-function openHistory() {
+async function openHistory() {
+    // Load first page of history
+    await loadHistory(1);
+
+    // Render history list and pagination
+    renderHistoryList();
+    renderPagination();
+
+    document.getElementById('history-modal').style.display = 'block';
+}
+
+function copyHistoryItem(index) {
+    if(sessionHistory[index]) copyToClipboard(sessionHistory[index].text);
+}
+
+// Render history list with current page data
+function renderHistoryList() {
     const list = document.getElementById('history-list');
-    list.innerHTML = sessionHistory.map((h, index) => `
+    const historyItems = sessionHistory.map((h, index) => `
         <div class="history-item">
             <div class="history-content">
                 <span class="history-time">${h.time}</span>
@@ -569,12 +595,82 @@ function openHistory() {
             <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;"
                     onclick="copyHistoryItem(${index})">Copy</button>
         </div>
-    `).join('') || '<div style="text-align:center; padding:20px; color:var(--text-muted);">No records.</div>';
-    document.getElementById('history-modal').style.display = 'block';
+    `).join('');
+
+    list.innerHTML = historyItems || '<div style="text-align:center; padding:20px; color:var(--text-muted);">No records.</div>';
 }
 
-function copyHistoryItem(index) {
-    if(sessionHistory[index]) copyToClipboard(sessionHistory[index].text);
+// Render pagination controls
+function renderPagination() {
+    const paginationContainer = document.getElementById('history-pagination');
+    if (!paginationContainer) return;
+
+    let paginationHTML = '';
+
+    if (historyTotalPages > 1) {
+        paginationHTML = `
+            <div class="pagination-container">
+                <button class="btn btn-secondary pagination-btn" onclick="loadPrevPage()" ${currentHistoryPage <= 1 ? 'disabled' : ''}>
+                    &lt; Prev
+                </button>
+                <span class="pagination-info">
+                    Page ${currentHistoryPage} of ${historyTotalPages} (${historyTotalRecords} total)
+                </span>
+                <button class="btn btn-secondary pagination-btn" onclick="loadNextPage()" ${currentHistoryPage >= historyTotalPages ? 'disabled' : ''}>
+                    Next &gt;
+                </button>
+            </div>
+        `;
+    }
+
+    paginationContainer.innerHTML = paginationHTML;
+}
+
+// Load previous history page
+async function loadPrevPage() {
+    if (currentHistoryPage <= 1) return;
+    await loadHistory(currentHistoryPage - 1);
+    renderHistoryList();
+    renderPagination();
+}
+
+// Load next history page
+async function loadNextPage() {
+    if (currentHistoryPage >= historyTotalPages) return;
+    await loadHistory(currentHistoryPage + 1);
+    renderHistoryList();
+    renderPagination();
+}
+
+// Cleanup old history (30+ days)
+async function cleanupHistory() {
+    if (!confirm("Clean up history records older than 30 days? This action cannot be undone.")) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/history/cleanup', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            alert(`Cleaned up ${data.cleaned_count || 0} records older than 30 days.`);
+            // Reload current page
+            await loadHistory(currentHistoryPage);
+            renderHistoryList();
+            renderPagination();
+        } else {
+            const errorData = await response.json().catch(() => ({}));
+            alert(`Failed to cleanup history: ${errorData.error || 'Unknown error'}`);
+        }
+    } catch (error) {
+        console.error('Cleanup error:', error);
+        alert('Failed to cleanup history. Please try again.');
+    }
 }
 
 function closeModal() { document.getElementById('history-modal').style.display = 'none'; }

@@ -30,7 +30,11 @@
         <div id="history-modal-content">
             <h3 style="margin-top:0;">History</h3>
             <div id="history-list"></div>
+            <div id="history-pagination"></div>
             <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="cleanupHistory()" style="padding: 8px 12px; font-size: 12px;">
+                    Cleanup (30+ days)
+                </button>
                 <button class="btn" onclick="closeModal()">Close</button>
             </div>
         </div>

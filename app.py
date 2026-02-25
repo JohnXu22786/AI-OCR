@@ -7,6 +7,7 @@ A web-based OCR tool using OpenRouter API for text extraction from images
 import os
 import json
 import logging
+import tempfile
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, session
 from flask_cors import CORS
@@ -31,8 +32,18 @@ except Exception as e:
     logger.error(f"Failed to load configuration: {e}")
     config = {}
 
-# In-memory session storage for history (per session)
-# Note: This will be lost when the server restarts
+# Import and initialize HistoryManager for file-based history storage
+try:
+    from history_manager import HistoryManager
+    history_manager = HistoryManager()
+    logger.info("HistoryManager initialized successfully")
+except ImportError as e:
+    logger.error(f"Failed to import HistoryManager: {e}")
+    history_manager = None
+
+# File-based session storage for history (per session)
+# History is now stored in system temp directory and persists across server restarts
+# session_history is kept for backward compatibility during transition
 session_history = {}
 
 def get_session_history():
@@ -41,23 +52,39 @@ def get_session_history():
     if not session_id:
         session_id = os.urandom(16).hex()
         session['session_id'] = session_id
-        session_history[session_id] = []
-    return session_history.get(session_id, [])
+
+    # If HistoryManager is available, use file-based storage
+    if history_manager:
+        return history_manager.load_history(session_id)
+    else:
+        # Fallback to in-memory storage
+        if session_id not in session_history:
+            session_history[session_id] = []
+        return session_history.get(session_id, [])
 
 def add_to_history(text):
     """Add text to session history"""
-    history = get_session_history()
-    history.insert(0, {
-        'id': len(history),
-        'time': datetime.now().strftime('%H:%M:%S'),
-        'text': text
-    })
-    # Keep only last 50 items
-    if len(history) > 50:
-        history = history[:50]
     session_id = session.get('session_id')
-    if session_id:
-        session_history[session_id] = history
+    if not session_id:
+        session_id = os.urandom(16).hex()
+        session['session_id'] = session_id
+
+    if history_manager:
+        # Use file-based storage
+        history_manager.add_record(session_id, text)
+    else:
+        # Fallback to in-memory storage
+        history = get_session_history()
+        history.insert(0, {
+            'id': len(history),
+            'time': datetime.now().strftime('%H:%M:%S'),
+            'text': text
+        })
+        # Keep only last 50 items
+        if len(history) > 50:
+            history = history[:50]
+        if session_id:
+            session_history[session_id] = history
 
 @app.route('/')
 def index():
@@ -80,9 +107,41 @@ def get_models():
 
 @app.route('/api/history', methods=['GET'])
 def get_history():
-    """Get session history"""
-    history = get_session_history()
-    return jsonify({'history': history})
+    """Get paginated session history"""
+    try:
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 10))
+
+        if page < 1 or per_page < 1 or per_page > 100:
+            return jsonify({'error': 'Invalid pagination parameters'}), 400
+
+        session_id = session.get('session_id')
+        if not session_id:
+            return jsonify({'error': 'No session found'}), 404
+
+        if history_manager:
+            # Use file-based storage with pagination
+            paginated_data = history_manager.get_paginated_history(
+                session_id, page, per_page
+            )
+            return jsonify(paginated_data)
+        else:
+            # Fallback to in-memory storage (full history)
+            history = get_session_history()
+            total = len(history)
+            start = (page - 1) * per_page
+            end = start + per_page
+            paginated = history[start:end]
+
+            return jsonify({
+                'page': page,
+                'per_page': per_page,
+                'total': total,
+                'total_pages': (total + per_page - 1) // per_page,
+                'history': paginated
+            })
+    except ValueError:
+        return jsonify({'error': 'Invalid parameter format'}), 400
 
 @app.route('/api/recognize', methods=['POST'])
 def recognize_text():
@@ -256,6 +315,35 @@ def stream_recognize():
     except Exception as e:
         logger.error(f"Streaming error: {e}")
         return jsonify({'error': f'Streaming failed: {str(e)}'}), 500
+
+@app.route('/api/history/cleanup', methods=['POST'])
+def cleanup_history():
+    """Clean up history records older than 30 days"""
+    try:
+        session_id = session.get('session_id')
+        if not session_id:
+            return jsonify({'error': 'No session found'}), 404
+
+        if history_manager:
+            # Clean up records older than 30 days
+            cleaned_count = history_manager.cleanup_old_records(session_id, days=30)
+            return jsonify({
+                'success': True,
+                'cleaned_count': cleaned_count,
+                'message': f'Cleaned up {cleaned_count} records older than 30 days'
+            })
+        else:
+            # In-memory storage: clear all history
+            if session_id in session_history:
+                session_history[session_id] = []
+            return jsonify({
+                'success': True,
+                'cleaned_count': 0,
+                'message': 'In-memory history cleared (file storage not available)'
+            })
+    except Exception as e:
+        logger.error(f"Cleanup error: {e}")
+        return jsonify({'error': f'Cleanup failed: {str(e)}'}), 500
 
 if __name__ == '__main__':
     from datetime import datetime

@@ -540,3 +540,43 @@ input:disabled + .toggle-slider:before {
         min-height: 300px;
     }
 }
+
+/* History pagination styles */
+.pagination-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin: 10px 0;
+    padding: 8px;
+    background: var(--card-bg);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+}
+
+.pagination-info {
+    font-size: 12px;
+    color: var(--text-muted);
+    min-width: 180px;
+    text-align: center;
+}
+
+.pagination-btn {
+    padding: 4px 8px;
+    font-size: 11px;
+    min-width: 60px;
+}
+
+.pagination-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Modal footer with cleanup button */
+.modal-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1rem;
+    flex-shrink: 0;
+}
